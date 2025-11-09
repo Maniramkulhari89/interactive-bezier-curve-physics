@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Bézier Curve with Physics</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #4fc3f7;
+        }
+        
+        .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #bbb;
+        }
+        
+        .canvas-container {
+            position: relative;
+            margin: 20px auto;
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        #bezierCanvas {
+            display: block;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .control-group {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 6px;
+            min-width: 200px;
+        }
+        
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            color: #4fc3f7;
+            font-size: 14px;
+        }
+        
+        .slider-container {
+            margin: 8px 0;
+        }
+        
+        .slider-container label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .slider-value {
+            display: inline-block;
+            width: 40px;
+            text-align: right;
+            font-size: 12px;
+            color: #4fc3f7;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        
+        .info-panel {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
+        .fps-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .instructions {
+            text-align: center;
+            margin: 10px 0;
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Bézier Curve with Physics</h1>
+        <div class="subtitle">Move your mouse to interact with the springy curve</div>
+        
+        <div class="instructions">
+            📱 Move mouse near control points P₁ and P₂ to interact | 🎯 Tangents show curve direction
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="bezierCanvas" width="800" height="500"></canvas>
+            <div class="fps-counter">FPS: <span id="fps">60</span></div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <h3>Spring Physics</h3>
+                <div class="slider-container">
+                    <label>Spring Constant (k): <span id="springValue" class="slider-value">0.15</span></label>
+                    <input type="range" id="springSlider" min="0.01" max="0.5" step="0.01" value="0.15">
+                </div>
+                <div class="slider-container">
+                    <label>Damping: <span id="dampingValue" class="slider-value">0.88</span></label>
+                    <input type="range" id="dampingSlider" min="0.7" max="0.99" step="0.01" value="0.88">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h3>Visualization</h3>
+                <div class="slider-container">
+                    <label>Tangent Density: <span id="densityValue" class="slider-value">8</span></label>
+                    <input type="range" id="densitySlider" min="1" max="20" step="1" value="8">
+                </div>
+                <div class="slider-container">
+                    <label>Tangent Length: <span id="lengthValue" class="slider-value">40</span></label>
+                    <input type="range" id="lengthSlider" min="10" max="100" step="5" value="40">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <h3>Interaction</h3>
+                <div class="slider-container">
+                    <label>Interaction Radius: <span id="radiusValue" class="slider-value">80</span></label>
+                    <input type="range" id="radiusSlider" min="20" max="150" step="5" value="80">
+                </div>
+                <button id="resetBtn" style="margin-top: 10px; padding: 8px 16px; background: #4fc3f7; border: none; border-radius: 4px; color: white; cursor: pointer;">
+                    Reset Curve
+                </button>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <strong>Academic Integrity Statement:</strong> This implementation represents my original work. All Bézier mathematics, physics simulations, and rendering logic have been implemented manually from scratch without using any prebuilt graphics or physics APIs. The code is organized into clean, separate modules for math, physics, rendering, and input handling.
+        </div>
+    </div>
+
+    <script src="physics.js"></script>
+    <script src="bezier.js"></script>
+    <script src="renderer.js"></script>
+    <script src="input.js"></script>
+    <script>
+        // Main application initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('bezierCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Initialize systems
+            const physics = new PhysicsSystem();
+            const bezier = new BezierCurve();
+            const renderer = new Renderer(ctx, canvas);
+            const input = new InputHandler(canvas, bezier, physics);
+            
+            // Set initial control points
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            bezier.controlPoints = [
+                { x: width * 0.2, y: height * 0.5 },  // P₀
+                { x: width * 0.4, y: height * 0.3 },  // P₁
+                { x: width * 0.6, y: height * 0.7 },  // P₂
+                { x: width * 0.8, y: height * 0.5 }   // P₃
+            ];
+            
+            // Setup physics for dynamic control points
+            physics.setupControlPoints(bezier.controlPoints);
+            
+            // Control sliders
+            const springSlider = document.getElementById('springSlider');
+            const dampingSlider = document.getElementById('dampingSlider');
+            const densitySlider = document.getElementById('densitySlider');
+            const lengthSlider = document.getElementById('lengthSlider');
+            const radiusSlider = document.getElementById('radiusSlider');
+            const resetBtn = document.getElementById('resetBtn');
+            
+            springSlider.addEventListener('input', (e) => {
+                physics.springConstant = parseFloat(e.target.value);
+                document.getElementById('springValue').textContent = e.target.value;
+            });
+            
+            dampingSlider.addEventListener('input', (e) => {
+                physics.damping = parseFloat(e.target.value);
+                document.getElementById('dampingValue').textContent = e.target.value;
+            });
+            
+            densitySlider.addEventListener('input', (e) => {
+                renderer.tangentDensity = parseInt(e.target.value);
+                document.getElementById('densityValue').textContent = e.target.value;
+            });
+            
+            lengthSlider.addEventListener('input', (e) => {
+                renderer.tangentLength = parseInt(e.target.value);
+                document.getElementById('lengthValue').textContent = e.target.value;
+            });
+            
+            radiusSlider.addEventListener('input', (e) => {
+                input.interactionRadius = parseInt(e.target.value);
+                document.getElementById('radiusValue').textContent = e.target.value;
+            });
+            
+            resetBtn.addEventListener('click', () => {
+                bezier.controlPoints = [
+                    { x: width * 0.2, y: height * 0.5 },
+                    { x: width * 0.4, y: height * 0.3 },
+                    { x: width * 0.6, y: height * 0.7 },
+                    { x: width * 0.8, y: height * 0.5 }
+                ];
+                physics.setupControlPoints(bezier.controlPoints);
+            });
+            
+            // Animation loop with FPS tracking
+            let lastTime = 0;
+            let frameCount = 0;
+            let fps = 60;
+            
+            function animate(currentTime) {
+                frameCount++;
+                
+                // Calculate FPS
+                if (currentTime - lastTime >= 1000) {
+                    fps = frameCount;
+                    frameCount = 0;
+                    lastTime = currentTime;
+                    document.getElementById('fps').textContent = fps;
+                }
+                
+                // Clear canvas
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Update physics
+                physics.update(bezier.controlPoints);
+                
+                // Handle input
+                input.update();
+                
+                // Render everything
+                renderer.render(bezier);
+                
+                requestAnimationFrame(animate);
+            }
+            
+            // Start animation
+            animate(0);
+        });
+    </script>
+</body>
+</html>
